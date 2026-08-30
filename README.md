@@ -1,15 +1,15 @@
 # ImageTestEnv
 
-В этом репозитории два сценария:
+In this repository there are two scenarios:
 
-1. Manual EKS path — ручной вариант для реального Kubernetes
-2. Push-triggered EC2 path — автоматический вариант для дешёвого и быстрых demo
+1. Manual EKS path — a manual setup for a real Kubernetes environment
+2. Push-triggered EC2 path — an automatic setup for a cheap and fast demo
 
-## 1. Ручной вариант: EKS
+## 1. Manual variant: EKS
 
-Это правильный Kubernetes-вариант. Он показывает, как в реальном проекте можно создать EKS-кластер и задеплоить приложение.
+This is the correct Kubernetes option. It shows how to create an EKS cluster in a real project and deploy an application.
 
-Файлы:
+Files:
 
 - [terraform-eks/main.tf](terraform-eks/main.tf)
 - [terraform-eks/variables.tf](terraform-eks/variables.tf)
@@ -19,7 +19,7 @@
 - [kubernetes/service.yaml](kubernetes/service.yaml)
 - [kubernetes/ingress.yaml](kubernetes/ingress.yaml)
 
-Как запустить вручную:
+How to run it manually:
 
 ```bash
 cd terraform-eks
@@ -29,13 +29,13 @@ terraform plan
 terraform apply
 ```
 
-После apply можно обновить kubeconfig:
+After apply, update the kubeconfig:
 
 ```bash
 aws eks update-kubeconfig --region eu-central-1 --name $(terraform output -raw cluster_name)
 ```
 
-Потом применить манифесты:
+Then deploy the app:
 
 ```bash
 kubectl apply -f ../kubernetes/namespace.yaml
@@ -44,69 +44,73 @@ kubectl apply -f ../kubernetes/service.yaml
 kubectl apply -f ../kubernetes/ingress.yaml
 ```
 
-Проверить:
+Check the workload:
 
 ```bash
 kubectl get pods -n weather-demo
 kubectl get svc -n weather-demo
 ```
 
-Удалить всё:
+Destroy the cluster when finished:
 
 ```bash
 terraform destroy
 ```
 
-Это рабочий Kubernetes шаблон и основной “правильный” путь для кластера.
+## 2. Automatic variant: EC2 after push
 
-## 2. Автоматический вариант: EC2 после пуша
+This is the cheap CI/CD demo flow. It creates a short-lived EC2 instance, configures nginx with Ansible, verifies the app, and destroys the environment automatically after 10 minutes.
 
-Это основной CI/CD сценарий для demo. Он запускает инфраструктуру и приложение автоматически после каждого пуша в main.
-
-Файлы:
+Files:
 
 - [.github/workflows/aws-weather-deploy.yml](.github/workflows/aws-weather-deploy.yml)
 - [terraform/main.tf](terraform/main.tf)
 - [terraform/variables.tf](terraform/variables.tf)
+- [terraform/outputs.tf](terraform/outputs.tf)
 - [ansible/playbook.yml](ansible/playbook.yml)
 
-Что происходит при push:
+How it works:
 
-1. GitHub Actions запускает workflow
-2. Terraform создаёт один EC2 instance
-3. Ansible настраивает nginx
-4. приложение публикуется на VM
-5. делается smoke test
-6. через 10 минут инфраструктура удаляется автоматически
+1. A push to `main` triggers the workflow.
+2. Terraform creates one EC2 instance.
+3. Ansible installs nginx and deploys the app.
+4. A smoke test verifies the page is reachable over HTTP.
+5. The instance is destroyed automatically after 10 minutes.
 
-То есть это именно “пуш → создать инстанс → сайт работает → удалить всё”.
+This is the cheapest practical demo to show infrastructure automation without keeping AWS resources running forever.
 
-Это самый дешёвый и безопасный вариант для демонстрации CD/CD и проверки infrastructure as code без долгого удержания ресурсов.
+## Manual destroy
 
-## Почему автоматический сценарий не k3s
+The EC2 demo can also be destroyed manually from GitHub Actions:
 
-Потому что в этом проекте автоматический сценарий должен быть чисто EC2 и дешёвым. k3s для push-демо не нужен, потому что он усложняет схему и не даёт ничего принципиально полезного при условии “не тратить деньги”.
+1. Open the repository in GitHub.
+2. Go to Actions.
+3. Select the workflow `AWS Weather Deploy`.
+4. Click `Run workflow`.
+5. Set `action` to `destroy` and start it.
 
-## Почему Terragrunt здесь
+You can also trigger it from the CLI:
 
-Файл [terragrunt/terragrunt.hcl](terragrunt/terragrunt.hcl) — это обёртка над Terraform, а не отдельный способ деплоя. Он нужен как шаблон env-defaults и стандартизированных параметров для окружений.
+```bash
+gh workflow run "AWS Weather Deploy" \
+  -f action=destroy \
+  -f region=eu-central-1
+```
 
-## Требования
+## Terragrunt
+
+The file [terragrunt/terragrunt.hcl](terragrunt/terragrunt.hcl) is a thin Terraform wrapper, not a separate deployment system. It keeps shared defaults and environment values in one place.
+
+## Requirements
 
 - AWS account
 - Terraform 1.8.5+
 - AWS CLI configured
-- GitHub Secrets for AWS and SSH keys
-- kubectl for the EKS path
-- optional Terragrunt if you want to use the wrapper
+- GitHub secrets for AWS access and SSH keys
+- `kubectl` for the EKS flow
+- Optional Terragrunt for the wrapper flow
 
-## Важно
-
-- Ручной сценарий — EKS, это реальный Kubernetes путь
-- Автоматический сценарий — EC2, это дешёвый и быстрый demo-путь
-- Для production лучше использовать EKS, но для бесплатного теста и автодестроя оптимален EC2
-
-## Структура репозитория
+## Repository structure
 
 ```text
 ImageTestEnv/
@@ -136,3 +140,15 @@ ImageTestEnv/
 ├── README.md
 └── .gitignore
 ```
+
+## Summary
+
+This repository is a small DevOps sandbox for:
+
+- infrastructure as code
+- automation with Terraform and Ansible
+- CI/CD with GitHub Actions
+- manual EKS deployment
+- short-lived EC2 demo environments with automatic cleanup
+
+It is meant for learning, demos, and experimentation rather than production deployment.
