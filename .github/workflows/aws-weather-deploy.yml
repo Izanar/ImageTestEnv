@@ -1,0 +1,193 @@
+name: AWS Weather Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action to run'
+        required: true
+        type: choice
+        default: apply
+        options:
+          - apply
+          - destroy
+      region:
+        description: 'AWS region'
+        required: true
+        type: choice
+        default: eu-central-1
+        options:
+          - eu-central-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_DEFAULT_REGION: ${{ github.event.inputs.region || 'eu-central-1' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Validate Terraform
+        run: |
+          terraform -chdir=terraform fmt -check -recursive
+          terraform -chdir=terraform init -backend=false
+          terraform -chdir=terraform validate
+
+      - name: Prepare SSH keys
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.AWS_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          printf '%s\n' "${{ secrets.AWS_SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+          chmod 700 ~/.ssh
+          chmod 600 ~/.ssh/id_rsa
+          chmod 644 ~/.ssh/id_rsa.pub
+
+      - name: Cleanup stale AWS resources
+        run: |
+          set -euo pipefail
+          export AWS_PAGER=""
+
+          echo "Cleaning stale resources for project image-test-env..."
+
+          for key in $(aws ec2 describe-key-pairs --query "KeyPairs[?contains(KeyName, 'image-test-env-dev-key')].KeyName" --output text 2>/dev/null || true); do
+            echo "Deleting stale key pair: $key"
+            aws ec2 delete-key-pair --key-name "$key" || true
+          done
+
+          for sg in $(aws ec2 describe-security-groups --filters "Name=tag:Project,Values=image-test-env" --query "SecurityGroups[].GroupId" --output text 2>/dev/null || true); do
+            echo "Deleting stale security group: $sg"
+            aws ec2 delete-security-group --group-id "$sg" || true
+          done
+
+          for instance in $(aws ec2 describe-instances --filters "Name=tag:Project,Values=image-test-env" --query "Reservations[].Instances[].InstanceId" --output text 2>/dev/null || true); do
+            echo "Terminating stale instance: $instance"
+            aws ec2 terminate-instances --instance-ids "$instance" >/dev/null || true
+          done
+
+          for vpc in $(aws ec2 describe-vpcs --filters "Name=tag:Project,Values=image-test-env" --query "Vpcs[].VpcId" --output text 2>/dev/null || true); do
+            echo "Cleaning VPC: $vpc"
+
+            for subnet in $(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpc" --query "Subnets[].SubnetId" --output text 2>/dev/null || true); do
+              aws ec2 delete-subnet --subnet-id "$subnet" || true
+            done
+
+            for igw in $(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$vpc" --query "InternetGateways[].InternetGatewayId" --output text 2>/dev/null || true); do
+              aws ec2 detach-internet-gateway --internet-gateway-id "$igw" --vpc-id "$vpc" || true
+              aws ec2 delete-internet-gateway --internet-gateway-id "$igw" || true
+            done
+
+            for rt in $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$vpc" --query "RouteTables[?Associations[?Main==\`false\`]].RouteTableId" --output text 2>/dev/null || true); do
+              aws ec2 delete-route-table --route-table-id "$rt" || true
+            done
+
+            for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$vpc" --query "SecurityGroups[?GroupName!='default'].GroupId" --output text 2>/dev/null || true); do
+              aws ec2 delete-security-group --group-id "$sg" || true
+            done
+
+            aws ec2 delete-vpc --vpc-id "$vpc" || true
+          done
+
+      - name: Terraform apply
+        if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+        env:
+          USER_PUBLIC_IP: ${{ secrets.USER_PUBLIC_IP }}
+        run: |
+          set -euo pipefail
+
+          RUNNER_IP=$(curl -fsSL https://api.ipify.org)
+          SSH_CIDRS=$(python3 - <<'PY'
+          import json, os
+          items = [f"{os.environ['RUNNER_IP']}/32"]
+          user_ip = os.environ.get('USER_PUBLIC_IP', '').strip()
+          if user_ip:
+              items.append(f"{user_ip}/32")
+          print(json.dumps(items))
+          PY
+          )
+
+          terraform -chdir=terraform apply -auto-approve \
+            -var="aws_region=${AWS_DEFAULT_REGION}" \
+            -var="public_key_path=$HOME/.ssh/id_rsa.pub" \
+            -var="ssh_cidr_blocks=${SSH_CIDRS}" \
+            -var="http_cidr_blocks=[\"0.0.0.0/0\"]" \
+            -var="https_cidr_blocks=[\"0.0.0.0/0\"]"
+
+          PUBLIC_IP=$(terraform -chdir=terraform output -raw public_ip || true)
+          INSTANCE_ID=$(terraform -chdir=terraform output -raw instance_id || true)
+          if [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "null" ] && [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "null" ]; then
+            echo "PUBLIC_IP=${PUBLIC_IP}"
+            echo "INSTANCE_ID=${INSTANCE_ID}"
+            echo "APP_URL=http://${PUBLIC_IP}"
+            echo "PUBLIC_IP=${PUBLIC_IP}" >> "$GITHUB_ENV"
+
+            aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
+            aws ec2 wait instance-status-ok --instance-ids "$INSTANCE_ID"
+
+            SSH_READY=0
+            for i in $(seq 1 30); do
+              if ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ~/.ssh/id_rsa ubuntu@${PUBLIC_IP} 'echo ready' >/dev/null 2>&1; then
+                echo "SSH is ready on ${PUBLIC_IP}"
+                SSH_READY=1
+                break
+              fi
+              echo "Waiting for SSH on ${PUBLIC_IP}... attempt ${i}/30"
+              sleep 10
+            done
+
+            if [ "$SSH_READY" -ne 1 ]; then
+              echo "EC2 SSH did not become ready within the timeout"
+              exit 1
+            fi
+
+            curl -I --max-time 120 "http://${PUBLIC_IP}"
+          else
+            echo "No public_ip output; Terraform apply may have failed or instance is not ready."
+            exit 1
+          fi
+
+      - name: Configure nginx via Ansible
+        if: github.event_name == 'push' || github.event.inputs.action == 'apply'
+        env:
+          PUBLIC_IP: ${{ env.PUBLIC_IP }}
+        run: |
+          set -euxo pipefail
+          python3 -m pip install --user ansible-core
+          export PATH="$HOME/.local/bin:$PATH"
+
+          cat > /tmp/image-test-env-inventory.ini <<EOF
+          [webservers]
+          web1 ansible_host=${PUBLIC_IP} ansible_user=ubuntu ansible_ssh_private_key_file=/home/runner/.ssh/id_rsa ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+          EOF
+
+          ansible-playbook -i /tmp/image-test-env-inventory.ini \
+            -e "app_repo_url=https://github.com/Izanar/AI_Nginx.git" \
+            ansible/playbook.yml
+
+          curl -I --max-time 120 "http://${PUBLIC_IP}"
+
+      - name: Auto destroy after 10 minutes
+        if: github.event_name == 'push'
+        run: |
+          echo "This push-triggered deployment will self-destruct in 600 seconds."
+          sleep 600
+          terraform -chdir=terraform destroy -auto-approve \
+            -var="aws_region=${AWS_DEFAULT_REGION}" \
+            -var="public_key_path=$HOME/.ssh/id_rsa.pub"
+
+      - name: Manual destroy
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+        run: |
+          terraform -chdir=terraform destroy -auto-approve \
+            -var="aws_region=${AWS_DEFAULT_REGION}" \
+            -var="public_key_path=$HOME/.ssh/id_rsa.pub"

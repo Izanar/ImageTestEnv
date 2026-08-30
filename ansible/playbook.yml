@@ -1,0 +1,67 @@
+---
+- name: Prepare Ubuntu web server
+  hosts: webservers
+  become: true
+  vars:
+    app_dir: /var/www/html
+    app_repo_url: "{{ app_repo_url | default('https://github.com/Izanar/AI_Nginx.git') }}"
+    app_cache_dir: /tmp/ai-nginx
+
+  tasks:
+    - name: Install nginx and required packages
+      apt:
+        name:
+          - nginx
+          - curl
+          - ca-certificates
+          - git
+        state: present
+        update_cache: true
+
+    - name: Ensure web root directory exists
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Remove previous app content from web root
+      shell: rm -rf "{{ app_dir }}"/* "{{ app_dir }}"/.[!.]* "{{ app_dir }}"/..?* 2>/dev/null || true
+      args:
+        executable: /bin/bash
+
+    - name: Clone application source
+      git:
+        repo: "{{ app_repo_url }}"
+        dest: "{{ app_cache_dir }}"
+        clone: true
+        update: true
+        depth: 1
+
+    - name: Copy static app files into nginx root
+      copy:
+        src: "{{ app_cache_dir }}/html/"
+        dest: "{{ app_dir }}/"
+        owner: www-data
+        group: www-data
+        mode: preserve
+        remote_src: true
+
+    - name: Ensure nginx is enabled and restarted
+      service:
+        name: nginx
+        state: restarted
+        enabled: true
+
+    - name: Validate nginx is serving content
+      uri:
+        url: "http://127.0.0.1"
+        return_content: true
+        timeout: 30
+      register: nginx_check
+
+    - name: Fail if the page is empty
+      fail:
+        msg: "nginx homepage is empty or unavailable"
+      when: nginx_check.status != 200 or 'html' not in nginx_check.body|lower
