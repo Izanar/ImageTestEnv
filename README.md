@@ -1,6 +1,6 @@
 # ImageTestEnv
 
-In this repository there are two scenarios:
+In this repository there are two scenarios(2):
 
 1. Manual EKS path — a manual setup for a real Kubernetes environment
 2. Push-triggered EC2 path — an automatic setup for a cheap and fast demo
