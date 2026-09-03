@@ -7,7 +7,6 @@
     kubernetes_dir: "{{ playbook_dir }}/../kubernetes"
     audio_sync_script: "{{ playbook_dir }}/../scripts/sync-audio-to-s3.sh"
     app_repo_url: "https://github.com/Izanar/AI_Nginx.git"
-    app_cache_dir: "/tmp/ai-nginx-eks-s3"
     audio_bucket_name: "{{ lookup('env', 'AUDIO_BUCKET_NAME') }}"
 
   tasks:
@@ -24,19 +23,11 @@
           - audio_bucket_name | length > 0
         fail_msg: "Set AUDIO_BUCKET_NAME to the Terraform audio bucket output"
 
-    - name: Clone application source
-      ansible.builtin.git:
-        repo: "{{ app_repo_url }}"
-        dest: "{{ app_cache_dir }}"
-        clone: true
-        update: true
-        depth: 1
-
     - name: Sync audio from the application repository to S3
       ansible.builtin.command:
         argv:
           - "{{ audio_sync_script }}"
-          - "{{ app_cache_dir }}"
+          - "{{ app_repo_url }}"
           - "{{ audio_bucket_name }}"
       environment:
         AWS_DEFAULT_REGION: "{{ lookup('env', 'AWS_DEFAULT_REGION') | default('eu-central-1', true) }}"
@@ -57,36 +48,3 @@
         kubectl wait --namespace weather-demo --for=condition=ready pod
         -l app=weather-app --timeout=180s
       changed_when: false
-
-    - name: Find the application pod
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - get
-          - pods
-          - --namespace
-          - weather-demo
-          - --selector
-          - app=weather-app
-          - --output
-          - jsonpath={.items[0].metadata.name}
-      register: app_pod
-      changed_when: false
-
-    - name: Copy application files into the pod
-      ansible.builtin.command:
-        argv:
-          - kubectl
-          - cp
-          - "{{ app_cache_dir }}/html/{{ item }}"
-          - "weather-demo/{{ app_pod.stdout }}:/usr/share/nginx/html/{{ item }}"
-      loop:
-        - index.html
-        - script.js
-        - style.css
-      changed_when: true
-
-    - name: Remove application checkout cache
-      ansible.builtin.file:
-        path: "{{ app_cache_dir }}"
-        state: absent

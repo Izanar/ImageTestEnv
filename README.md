@@ -12,6 +12,14 @@ private S3 bucket for audio files from `AI_Nginx`.
 - Ansible
 - `kubectl`
 - Git
+- A public GitHub Container Registry package, built by the manual workflow
+
+## Build the application image
+
+The S3 image contains `index.html`, `script.js`, and `style.css`, but no audio.
+Build and publish it to the public GitHub Container Registry package by
+starting the `Validate and Build S3 Image` workflow manually from the Actions
+tab. The workflow does not run on push.
 
 ## Create the environment
 
@@ -41,11 +49,11 @@ export AWS_DEFAULT_REGION="eu-central-1"
 ansible-playbook -i localhost, ../ansible/eks-deploy.yml
 ```
 
-The source repository must contain an `audio/` directory. Ansible clones the
-repository once, puts `html/audio/` in the private S3 bucket, and copies the
-remaining web files into the nginx pod. CloudFront reads the bucket through
-Origin Access Control, while nginx proxies `/audio/` to CloudFront. The client
-has no direct S3 access and the audio files are not copied into the pod.
+The source repository must contain an `audio/` directory. Ansible puts
+`html/audio/` in the private S3 bucket, while the published image provides the
+remaining web files. CloudFront reads the bucket through Origin Access Control,
+while nginx proxies `/audio/` to CloudFront. The client has no direct S3 access
+and the audio files are not copied into the pod.
 
 ```bash
 kubectl wait --namespace ingress-nginx \
@@ -63,6 +71,9 @@ LOAD_BALANCER_HOST="$(kubectl get svc -n ingress-nginx ingress-nginx-controller 
 curl -H "Host: weather.local" "http://${LOAD_BALANCER_HOST}"
 curl -H "Host: weather.local" "http://${LOAD_BALANCER_HOST}/audio/"
 ```
+
+For browser testing without paid DNS, add the hostname to `/etc/hosts` after
+resolving the LoadBalancer address, then open `http://weather.local`.
 
 ## Remove everything
 

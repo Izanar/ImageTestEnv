@@ -23,7 +23,7 @@ spec:
             name: audio-config
       containers:
         - name: weather-app
-          image: nginx:1.27-alpine
+          image: ghcr.io/izanar/image-test-env-s3:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80

@@ -1,0 +1,52 @@
+name: Validate and Build S3 Image
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Validate Terraform
+        run: |
+          terraform -chdir=terraform-eks fmt -check -recursive
+          terraform -chdir=terraform-eks init -backend=false -input=false
+          terraform -chdir=terraform-eks validate
+
+      - name: Validate Ansible
+        run: ansible-playbook --syntax-check -i localhost, ansible/eks-deploy.yml
+
+      - name: Validate audio sync script
+        run: bash -n scripts/sync-audio-to-s3.sh
+
+  build:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/izanar/image-test-env-s3:latest
