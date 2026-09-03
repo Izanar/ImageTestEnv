@@ -8,6 +8,8 @@ private S3 bucket for audio files from `AI_Nginx`.
 
 - AWS CLI configured with permissions for EKS, EC2, IAM, S3, and ELB
 - Terraform 1.8.5+
+- Terragrunt 0.67.16+
+- Ansible
 - `kubectl`
 - Git
 
@@ -15,11 +17,12 @@ private S3 bucket for audio files from `AI_Nginx`.
 
 ```bash
 cd terraform-eks
-terraform init
 terraform validate
-terraform plan
-terraform apply
-aws eks update-kubeconfig --region eu-central-1 --name "$(terraform output -raw cluster_name)"
+terragrunt --working-dir ../terragrunt init
+terragrunt --working-dir ../terragrunt plan
+terragrunt --working-dir ../terragrunt apply
+aws eks update-kubeconfig --region eu-central-1 \
+  --name "$(terragrunt --working-dir ../terragrunt output -raw cluster_name)"
 ```
 
 The EKS API endpoint is public for this demo and access is authenticated by
@@ -32,9 +35,10 @@ private endpoint with a bastion host or AWS Systems Manager Session Manager.
 The S3 bucket is private. Sync audio from the public `AI_Nginx` repository:
 
 ```bash
-../scripts/sync-audio-to-s3.sh \
-  https://github.com/Izanar/AI_Nginx.git \
-  "$(terraform output -raw audio_bucket_name)"
+export AUDIO_BUCKET_NAME="$(terragrunt --working-dir ../terragrunt \
+  output -raw audio_bucket_name)"
+export AWS_DEFAULT_REGION="eu-central-1"
+ansible-playbook -i localhost, ../ansible/eks-deploy.yml
 ```
 
 The source repository must contain an `audio/` directory. The Kubernetes pod
@@ -43,11 +47,6 @@ objects into an internal volume, so clients reach the files through the nginx
 Ingress at `/audio/` without direct S3 access.
 
 ```bash
-kubectl apply -f ../kubernetes/namespace.yaml
-kubectl apply -f ../kubernetes/deployment.yaml
-kubectl apply -f ../kubernetes/service.yaml
-kubectl apply -f ../kubernetes/ingress.yaml
-
 kubectl wait --namespace ingress-nginx \
   --for=condition=available deployment/ingress-nginx-controller \
   --timeout=180s
@@ -70,7 +69,7 @@ Delete application objects first so the Ingress LoadBalancer can be released:
 
 ```bash
 kubectl delete -f ../kubernetes/ --ignore-not-found
-terraform destroy
+terragrunt --working-dir ../terragrunt destroy --non-interactive
 ```
 
 Terraform then removes the EKS control plane, Spot node group, IAM/IRSA
@@ -92,7 +91,9 @@ LoadBalancer remains briefly, wait for AWS cleanup and check again.
 
 ```text
 ├── kubernetes/
+├── ansible/eks-deploy.yml
 ├── scripts/sync-audio-to-s3.sh
+├── terragrunt/terragrunt.hcl
 └── terraform-eks/
 ```
 
