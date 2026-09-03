@@ -48,6 +48,11 @@
         mode: preserve
         remote_src: true
 
+    - name: Remove application checkout cache
+      file:
+        path: "{{ app_cache_dir }}"
+        state: absent
+
     - name: Ensure nginx is enabled and restarted
       service:
         name: nginx
