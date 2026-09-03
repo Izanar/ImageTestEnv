@@ -114,7 +114,8 @@ resource "helm_release" "ingress_nginx" {
 }
 
 resource "aws_s3_bucket" "audio" {
-  bucket = "${var.project_name}-${var.environment}-audio-${data.aws_caller_identity.current.account_id}"
+  bucket        = "${var.project_name}-${var.environment}-audio-${data.aws_caller_identity.current.account_id}"
+  force_destroy = true
 
   tags = {
     Environment = var.environment
@@ -165,61 +166,6 @@ resource "aws_s3_bucket_lifecycle_configuration" "audio" {
   }
 }
 
-data "aws_iam_policy_document" "audio_read" {
-  statement {
-    actions   = ["s3:ListBucket"]
-    resources = [aws_s3_bucket.audio.arn]
-  }
-
-  statement {
-    actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.audio.arn}/audio/*"]
-  }
-}
-
-resource "aws_iam_policy" "audio_read" {
-  name   = "${var.project_name}-${var.environment}-audio-read"
-  policy = data.aws_iam_policy_document.audio_read.json
-}
-
-data "aws_iam_policy_document" "audio_irsa_assume_role" {
-  statement {
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-
-    principals {
-      type        = "Federated"
-      identifiers = [module.eks.oidc_provider_arn]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub"
-      values   = ["system:serviceaccount:weather-demo:weather-app"]
-    }
-
-    condition {
-      test     = "StringEquals"
-      variable = "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud"
-      values   = ["sts.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "audio_reader" {
-  name               = "${var.project_name}-${var.environment}-audio-reader"
-  assume_role_policy = data.aws_iam_policy_document.audio_irsa_assume_role.json
-
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
-
-resource "aws_iam_role_policy_attachment" "audio_reader" {
-  role       = aws_iam_role.audio_reader.name
-  policy_arn = aws_iam_policy.audio_read.arn
-}
-
 resource "kubernetes_namespace_v1" "weather_demo" {
   metadata {
     name = "weather-demo"
@@ -228,24 +174,96 @@ resource "kubernetes_namespace_v1" "weather_demo" {
   depends_on = [module.eks]
 }
 
-resource "kubernetes_service_account_v1" "weather_app" {
-  metadata {
-    name      = "weather-app"
-    namespace = kubernetes_namespace_v1.weather_demo.metadata[0].name
+resource "aws_cloudfront_origin_access_control" "audio" {
+  name                              = "${var.project_name}-${var.environment}-audio"
+  description                       = "Private access to the audio S3 bucket"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
 
-    annotations = {
-      "eks.amazonaws.com/role-arn" = aws_iam_role.audio_reader.arn
+resource "aws_cloudfront_distribution" "audio" {
+  enabled = true
+  comment = "Private audio delivery for ${var.project_name}-${var.environment}"
+
+  origin {
+    domain_name              = aws_s3_bucket.audio.bucket_regional_domain_name
+    origin_id                = "audio-s3"
+    origin_access_control_id = aws_cloudfront_origin_access_control.audio.id
+  }
+
+  default_cache_behavior {
+    target_origin_id       = "audio-s3"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+
+    forwarded_values {
+      query_string = false
+
+      cookies {
+        forward = "none"
+      }
+    }
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+}
+
+data "aws_iam_policy_document" "audio_cloudfront_read" {
+  statement {
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.audio.arn}/audio/*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.audio.arn]
     }
   }
 }
 
-resource "kubernetes_config_map_v1" "audio" {
+resource "aws_s3_bucket_policy" "audio" {
+  bucket = aws_s3_bucket.audio.id
+  policy = data.aws_iam_policy_document.audio_cloudfront_read.json
+}
+
+resource "kubernetes_config_map_v1" "nginx" {
   metadata {
     name      = "audio-config"
     namespace = kubernetes_namespace_v1.weather_demo.metadata[0].name
   }
 
   data = {
-    AUDIO_BUCKET = aws_s3_bucket.audio.bucket
+    "default.conf" = <<-EOT
+      server {
+        listen 80;
+        server_name _;
+        root /usr/share/nginx/html;
+
+        location /audio/ {
+          proxy_pass https://${aws_cloudfront_distribution.audio.domain_name}/audio/;
+          proxy_set_header Host ${aws_cloudfront_distribution.audio.domain_name};
+          proxy_ssl_server_name on;
+        }
+
+        location / {
+          try_files $uri $uri/ /index.html;
+        }
+      }
+    EOT
   }
 }

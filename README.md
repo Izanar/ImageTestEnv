@@ -41,10 +41,11 @@ export AWS_DEFAULT_REGION="eu-central-1"
 ansible-playbook -i localhost, ../ansible/eks-deploy.yml
 ```
 
-The source repository must contain an `audio/` directory. The Kubernetes pod
-uses IRSA with read-only access to `audio/*`. Its init container downloads the
-objects into an internal volume, so clients reach the files through the nginx
-Ingress at `/audio/` without direct S3 access.
+The source repository must contain an `audio/` directory. Ansible runs the sync
+script and puts the files in the private S3 bucket. CloudFront reads the bucket
+through Origin Access Control, while nginx proxies `/audio/` to CloudFront.
+The client has no direct S3 access and the audio files are not copied into the
+pod.
 
 ```bash
 kubectl wait --namespace ingress-nginx \
@@ -72,8 +73,8 @@ kubectl delete -f ../kubernetes/ --ignore-not-found
 terragrunt --working-dir ../terragrunt destroy --non-interactive
 ```
 
-Terraform then removes the EKS control plane, Spot node group, IAM/IRSA
-resources, private S3 bucket, VPC, subnets, NAT Gateway, route tables,
+Terraform then removes the EKS control plane, Spot node group, private S3
+bucket, CloudFront distribution, VPC, subnets, NAT Gateway, route tables,
 Internet Gateway, security groups, and Helm-installed Ingress Controller.
 
 Verify that the cluster and project VPC are gone:
