@@ -17,25 +17,6 @@ spec:
       labels:
         app: weather-app
     spec:
-      serviceAccountName: weather-app
-      volumes:
-        - name: audio
-          emptyDir: {}
-      initContainers:
-        - name: sync-audio
-          image: amazon/aws-cli:2.17.49
-          command:
-            - /bin/sh
-            - -c
-            - >-
-              mkdir -p /audio &&
-              aws s3 sync s3://${AUDIO_BUCKET}/audio /audio --only-show-errors
-          envFrom:
-            - configMapRef:
-                name: audio-config
-          volumeMounts:
-            - name: audio
-              mountPath: /audio
       containers:
         - name: weather-app
           image: nginx:1.27-alpine
@@ -43,9 +24,6 @@ spec:
           ports:
             - containerPort: 80
               name: http
-          volumeMounts:
-            - name: audio
-              mountPath: /usr/share/nginx/html/audio
           readinessProbe:
             httpGet:
               path: /

@@ -1,12 +1,12 @@
 # ImageTestEnv: EKS
 
 This branch contains only the manual AWS Kubernetes scenario. It creates an
-Amazon EKS cluster, one Spot worker node, an NGINX Ingress Controller, and a
-private S3 bucket for audio files from `AI_Nginx`.
+Amazon EKS cluster, one Spot worker node, and an NGINX Ingress Controller.
+There is no S3 storage in this branch.
 
 ## Requirements
 
-- AWS CLI configured with permissions for EKS, EC2, IAM, S3, and ELB
+- AWS CLI configured with permissions for EKS, EC2, IAM, and ELB
 - Terraform 1.8.5+
 - Terragrunt 0.67.16+
 - Ansible
@@ -30,21 +30,18 @@ AWS IAM. Worker nodes run in private subnets and do not expose SSH. A bastion
 is therefore not needed for this educational setup. For production, use a
 private endpoint with a bastion host or AWS Systems Manager Session Manager.
 
-## Load the audio and deploy
+## Deploy with Ansible
 
-The S3 bucket is private. Sync audio from the public `AI_Nginx` repository:
+Ansible runs the deployment commands after Terraform and Terragrunt create the
+cluster. Kubernetes remains responsible for scheduling and supervising the
+nginx pod.
 
 ```bash
-export AUDIO_BUCKET_NAME="$(terragrunt --working-dir ../terragrunt \
-  output -raw audio_bucket_name)"
-export AWS_DEFAULT_REGION="eu-central-1"
 ansible-playbook -i localhost, ../ansible/eks-deploy.yml
 ```
 
-The source repository must contain an `audio/` directory. The Kubernetes pod
-uses IRSA with read-only access to `audio/*`. Its init container downloads the
-objects into an internal volume, so clients reach the files through the nginx
-Ingress at `/audio/` without direct S3 access.
+The playbook applies the namespace, Deployment, Service, and Ingress. Terraform
+installs the NGINX Ingress Controller automatically in `ingress-nginx`.
 
 ```bash
 kubectl wait --namespace ingress-nginx \
@@ -60,7 +57,6 @@ Get the LoadBalancer hostname and test the host rule:
 LOAD_BALANCER_HOST="$(kubectl get svc -n ingress-nginx ingress-nginx-controller \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 curl -H "Host: weather.local" "http://${LOAD_BALANCER_HOST}"
-curl -H "Host: weather.local" "http://${LOAD_BALANCER_HOST}/audio/"
 ```
 
 ## Remove everything
@@ -72,9 +68,9 @@ kubectl delete -f ../kubernetes/ --ignore-not-found
 terragrunt --working-dir ../terragrunt destroy --non-interactive
 ```
 
-Terraform then removes the EKS control plane, Spot node group, IAM/IRSA
-resources, private S3 bucket, VPC, subnets, NAT Gateway, route tables,
-Internet Gateway, security groups, and Helm-installed Ingress Controller.
+Terraform removes the EKS control plane, Spot node group, VPC, subnets, NAT
+Gateway, route tables, Internet Gateway, security groups, and the Helm-installed
+Ingress Controller.
 
 Verify that the cluster and project VPC are gone:
 
@@ -92,10 +88,9 @@ LoadBalancer remains briefly, wait for AWS cleanup and check again.
 ```text
 ├── kubernetes/
 ├── ansible/eks-deploy.yml
-├── scripts/sync-audio-to-s3.sh
 ├── terragrunt/terragrunt.hcl
 └── terraform-eks/
 ```
 
-This branch is intentionally separate from the cheap push-triggered EC2
-workflow in `main`.
+This branch is intentionally separate from the automatic EC2 workflow in
+`main` and from the S3 audio variant in `feature/eks-s3-audio`.
