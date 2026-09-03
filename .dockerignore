@@ -1,0 +1,7 @@
+.git
+.terraform
+*.tfstate
+*.tfstate.*
+.gitignore
+README.md
+.github
