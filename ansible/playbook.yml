@@ -8,7 +8,7 @@
     app_cache_dir: /tmp/ai-nginx
 
   tasks:
-    - name: Install nginx and required packagess
+    - name: Install nginx and required packages
       apt:
         name:
           - nginx

@@ -96,19 +96,6 @@ resource "aws_instance" "web" {
   vpc_security_group_ids = [aws_security_group.web.id]
   key_name               = aws_key_pair.deployer.key_name
 
-  user_data = <<-EOT
-    #!/bin/bash
-    set -eux
-    export DEBIAN_FRONTEND=noninteractive
-    apt-get update
-    apt-get install -y nginx curl ca-certificates
-
-    mkdir -p /var/www/html
-    chown -R www-data:www-data /var/www/html
-    systemctl enable nginx
-    systemctl start nginx
-  EOT
-
   tags = {
     Name        = "${var.project_name}-${var.environment}-web"
     Environment = var.environment
