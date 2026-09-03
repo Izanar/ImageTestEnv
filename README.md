@@ -12,6 +12,14 @@ There is no S3 storage in this branch.
 - Ansible
 - `kubectl`
 - Git
+- A public GitHub Container Registry package, built by the manual workflow
+
+## Build the application image
+
+The Kubernetes image contains the complete `html/` directory from `AI_Nginx`,
+including audio. Build and publish it to the public GitHub Container Registry
+package by starting the `Validate and Build Kubernetes Image` workflow manually
+from the Actions tab. The workflow does not run on push.
 
 ## Create the environment
 
@@ -34,8 +42,8 @@ private endpoint with a bastion host or AWS Systems Manager Session Manager.
 
 Ansible runs the deployment commands after Terraform and Terragrunt create the
 cluster. Kubernetes remains responsible for scheduling and supervising the
-nginx pod. Ansible clones `AI_Nginx`, waits for the pod, and copies its complete
-`html/` directory into the nginx document root.
+nginx pod. The Deployment uses the published application image, so the files
+remain available when Kubernetes recreates the pod.
 
 ```bash
 ansible-playbook -i localhost, ../ansible/eks-deploy.yml
@@ -59,6 +67,9 @@ LOAD_BALANCER_HOST="$(kubectl get svc -n ingress-nginx ingress-nginx-controller 
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 curl -H "Host: weather.local" "http://${LOAD_BALANCER_HOST}"
 ```
+
+For browser testing without paid DNS, add the hostname to `/etc/hosts` after
+resolving the LoadBalancer address, then open `http://weather.local`.
 
 ## Remove everything
 
