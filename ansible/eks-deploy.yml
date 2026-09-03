@@ -1,0 +1,44 @@
+---
+- name: Deploy the EKS application
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    kubernetes_dir: "{{ playbook_dir }}/../kubernetes"
+    audio_sync_script: "{{ playbook_dir }}/../scripts/sync-audio-to-s3.sh"
+    app_repo_url: "https://github.com/Izanar/AI_Nginx.git"
+    audio_bucket_name: "{{ lookup('env', 'AUDIO_BUCKET_NAME') }}"
+
+  tasks:
+    - name: Check required deployment tools
+      ansible.builtin.command: "{{ item.command }}"
+      loop:
+        - command: kubectl version --client
+        - command: aws --version
+      changed_when: false
+
+    - name: Sync audio from the application repository to S3
+      ansible.builtin.command:
+        argv:
+          - "{{ audio_sync_script }}"
+          - "{{ app_repo_url }}"
+          - "{{ audio_bucket_name }}"
+      environment:
+        AWS_DEFAULT_REGION: "{{ lookup('env', 'AWS_DEFAULT_REGION') | default('eu-central-1', true) }}"
+      when: audio_bucket_name | length > 0
+      changed_when: true
+
+    - name: Apply Kubernetes manifests
+      ansible.builtin.command: kubectl apply -f {{ item }}
+      loop:
+        - "{{ kubernetes_dir }}/namespace.yaml"
+        - "{{ kubernetes_dir }}/deployment.yaml"
+        - "{{ kubernetes_dir }}/service.yaml"
+        - "{{ kubernetes_dir }}/ingress.yaml"
+      changed_when: true
+
+    - name: Wait for the application pod
+      ansible.builtin.command:
+        kubectl wait --namespace weather-demo --for=condition=ready pod
+        -l app=weather-app --timeout=180s
+      changed_when: false
