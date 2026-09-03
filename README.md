@@ -34,7 +34,8 @@ private endpoint with a bastion host or AWS Systems Manager Session Manager.
 
 Ansible runs the deployment commands after Terraform and Terragrunt create the
 cluster. Kubernetes remains responsible for scheduling and supervising the
-nginx pod.
+nginx pod. Ansible clones `AI_Nginx`, waits for the pod, and copies its complete
+`html/` directory into the nginx document root.
 
 ```bash
 ansible-playbook -i localhost, ../ansible/eks-deploy.yml

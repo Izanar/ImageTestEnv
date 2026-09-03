@@ -5,6 +5,8 @@
   gather_facts: false
   vars:
     kubernetes_dir: "{{ playbook_dir }}/../kubernetes"
+    app_repo_url: "https://github.com/Izanar/AI_Nginx.git"
+    app_cache_dir: "/tmp/ai-nginx-eks"
 
   tasks:
     - name: Check kubectl is available
@@ -12,6 +14,14 @@
       loop:
         - command: kubectl version --client
       changed_when: false
+
+    - name: Clone application source
+      ansible.builtin.git:
+        repo: "{{ app_repo_url }}"
+        dest: "{{ app_cache_dir }}"
+        clone: true
+        update: true
+        depth: 1
 
     - name: Apply Kubernetes manifests
       ansible.builtin.command: kubectl apply -f {{ item }}
@@ -27,3 +37,32 @@
         kubectl wait --namespace weather-demo --for=condition=ready pod
         -l app=weather-app --timeout=180s
       changed_when: false
+
+    - name: Find the application pod
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - get
+          - pods
+          - --namespace
+          - weather-demo
+          - --selector
+          - app=weather-app
+          - --output
+          - jsonpath={.items[0].metadata.name}
+      register: app_pod
+      changed_when: false
+
+    - name: Copy application files into the pod
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - cp
+          - "{{ app_cache_dir }}/html/."
+          - "weather-demo/{{ app_pod.stdout }}:/usr/share/nginx/html/"
+      changed_when: true
+
+    - name: Remove application checkout cache
+      ansible.builtin.file:
+        path: "{{ app_cache_dir }}"
+        state: absent
