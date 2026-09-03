@@ -5,6 +5,10 @@ EC2 environment. GitHub Actions creates the instance with Terraform, uses
 Ansible to install and configure nginx, verifies the application, and destroys
 the infrastructure after 10 minutes.
 
+Terragrunt is the workflow entry point for the EC2 Terraform module. Terraform
+defines resources, Terragrunt supplies environment defaults, and Ansible
+configures the created instance.
+
 The EKS/Kubernetes scenario is maintained separately in the
 `feature/kubernetes-eks` branch.
 
@@ -20,7 +24,8 @@ Configure these GitHub repository secrets:
 - optional `USER_PUBLIC_IP`
 
 The AWS identity must be allowed to manage the EC2 resources used by this
-workflow. Terraform 1.8.5+ and Ansible are installed by the workflow runner.
+workflow. Terraform 1.8.5+, Terragrunt 0.67.16+, and Ansible are installed by
+the workflow runner.
 
 ## Automatic deployment
 
@@ -29,12 +34,12 @@ A push to `main` starts the workflow
 these steps:
 
 1. Validates Terraform.
-2. Creates one `t3.micro` Ubuntu EC2 instance in the default VPC.
+2. Terragrunt creates one `t3.micro` Ubuntu EC2 instance in the default VPC.
 3. Opens SSH only to the GitHub runner IP and optional `USER_PUBLIC_IP`.
 4. Waits for SSH readiness.
 5. Ansible installs nginx, clones `AI_Nginx`, and publishes its `html/` folder.
 6. An HTTP smoke test checks the page.
-7. Terraform destroys the instance and related resources after 10 minutes.
+7. Terragrunt destroys the instance and related resources after 10 minutes.
 
 HTTP and HTTPS are public for this demo. SSH is limited to the runner and the
 optional user IP.
@@ -68,6 +73,7 @@ ansible-playbook --syntax-check -i ansible/inventory.ini ansible/playbook.yml
 ├── ansible/
 │   ├── inventory.ini
 │   └── playbook.yml
+├── terragrunt/terragrunt.hcl
 └── terraform/
     ├── main.tf
     ├── outputs.tf

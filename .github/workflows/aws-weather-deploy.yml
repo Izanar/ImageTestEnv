@@ -38,6 +38,15 @@ jobs:
         with:
           terraform_version: 1.8.5
 
+      - name: Setup Terragrunt
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL \
+            https://github.com/gruntwork-io/terragrunt/releases/download/v0.67.16/terragrunt_linux_amd64 \
+            -o "$HOME/.local/bin/terragrunt"
+          chmod +x "$HOME/.local/bin/terragrunt"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Validate Terraform
         run: |
           terraform -chdir=terraform fmt -check -recursive
@@ -116,15 +125,15 @@ jobs:
           PY
           )
 
-          terraform -chdir=terraform apply -auto-approve \
+          terragrunt --working-dir terragrunt apply --non-interactive -auto-approve \
             -var="aws_region=${AWS_DEFAULT_REGION}" \
             -var="public_key_path=$HOME/.ssh/id_rsa.pub" \
             -var="ssh_cidr_blocks=${SSH_CIDRS}" \
             -var="http_cidr_blocks=[\"0.0.0.0/0\"]" \
             -var="https_cidr_blocks=[\"0.0.0.0/0\"]"
 
-          PUBLIC_IP=$(terraform -chdir=terraform output -raw public_ip || true)
-          INSTANCE_ID=$(terraform -chdir=terraform output -raw instance_id || true)
+          PUBLIC_IP=$(terragrunt --working-dir terragrunt output -raw public_ip || true)
+          INSTANCE_ID=$(terragrunt --working-dir terragrunt output -raw instance_id || true)
           if [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "null" ] && [ -n "$INSTANCE_ID" ] && [ "$INSTANCE_ID" != "null" ]; then
             echo "PUBLIC_IP=${PUBLIC_IP}"
             echo "INSTANCE_ID=${INSTANCE_ID}"
@@ -181,13 +190,13 @@ jobs:
         run: |
           echo "This push-triggered deployment will self-destruct in 600 seconds."
           sleep 600
-          terraform -chdir=terraform destroy -auto-approve \
+          terragrunt --working-dir terragrunt destroy --non-interactive -auto-approve \
             -var="aws_region=${AWS_DEFAULT_REGION}" \
             -var="public_key_path=$HOME/.ssh/id_rsa.pub"
 
       - name: Manual destroy
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
         run: |
-          terraform -chdir=terraform destroy -auto-approve \
+          terragrunt --working-dir terragrunt destroy --non-interactive -auto-approve \
             -var="aws_region=${AWS_DEFAULT_REGION}" \
             -var="public_key_path=$HOME/.ssh/id_rsa.pub"
