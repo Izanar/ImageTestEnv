@@ -31,7 +31,7 @@ variable "public_key_path" {
 variable "ssh_cidr_blocks" {
   description = "CIDR ranges allowed to reach SSH on the EC2 instance"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = []
 }
 
 variable "http_cidr_blocks" {

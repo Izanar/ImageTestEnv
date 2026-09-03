@@ -2,6 +2,26 @@ provider "aws" {
   region = var.aws_region
 }
 
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args = [
+        "eks",
+        "get-token",
+        "--cluster-name",
+        module.eks.cluster_name,
+        "--region",
+        var.aws_region
+      ]
+    }
+  }
+}
+
 data "aws_availability_zones" "available" {
   state = "available"
 }
@@ -59,4 +79,15 @@ module "eks" {
     Environment = var.environment
     Project     = var.project_name
   }
+}
+
+resource "helm_release" "ingress_nginx" {
+  name             = "ingress-nginx"
+  namespace        = "ingress-nginx"
+  create_namespace = true
+  repository       = "https://kubernetes.github.io/ingress-nginx"
+  chart            = "ingress-nginx"
+  version          = "4.11.2"
+
+  depends_on = [module.eks]
 }
