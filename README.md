@@ -94,11 +94,21 @@ aws eks update-kubeconfig --region eu-central-1 --name $(terraform output -raw c
 Then deploy the app:
 
 ```bash
+../scripts/sync-audio-to-s3.sh \
+  https://github.com/Izanar/AI_Nginx.git \
+  "$(terraform output -raw audio_bucket_name)"
+
 kubectl apply -f ../kubernetes/namespace.yaml
 kubectl apply -f ../kubernetes/deployment.yaml
 kubectl apply -f ../kubernetes/service.yaml
 kubectl apply -f ../kubernetes/ingress.yaml
 ```
+
+The S3 bucket is private. The `weather-app` pod receives a narrowly scoped IAM
+role through IRSA. Its init container downloads `s3://<bucket>/audio` into an
+internal volume, and nginx serves those files under `/audio/`; the client has
+no direct S3 access. The `AI_Nginx` repository must contain an `audio/`
+directory for the sync command to succeed.
 
 Terraform installs the NGINX Ingress Controller automatically in the
 `ingress-nginx` namespace. Wait for its AWS LoadBalancer and test the
@@ -217,6 +227,8 @@ ImageTestEnv/
 ├── ansible/
 │   ├── docker-playbook.yml
 │   └── playbook.yml
+├── scripts/
+│   └── sync-audio-to-s3.sh
 ├── kubernetes/
 │   ├── deployment.yaml
 │   ├── ingress.yaml

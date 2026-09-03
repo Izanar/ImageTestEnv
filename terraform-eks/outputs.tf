@@ -17,3 +17,8 @@ output "kubeconfig_command" {
   description = "Command to fetch kubeconfig"
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}"
 }
+
+output "audio_bucket_name" {
+  description = "Private S3 bucket used for application audio"
+  value       = aws_s3_bucket.audio.bucket
+}
