@@ -41,11 +41,11 @@ export AWS_DEFAULT_REGION="eu-central-1"
 ansible-playbook -i localhost, ../ansible/eks-deploy.yml
 ```
 
-The source repository must contain an `audio/` directory. Ansible runs the sync
-script and puts the files in the private S3 bucket. CloudFront reads the bucket
-through Origin Access Control, while nginx proxies `/audio/` to CloudFront.
-The client has no direct S3 access and the audio files are not copied into the
-pod.
+The source repository must contain an `audio/` directory. Ansible clones the
+repository once, puts `html/audio/` in the private S3 bucket, and copies the
+remaining web files into the nginx pod. CloudFront reads the bucket through
+Origin Access Control, while nginx proxies `/audio/` to CloudFront. The client
+has no direct S3 access and the audio files are not copied into the pod.
 
 ```bash
 kubectl wait --namespace ingress-nginx \
