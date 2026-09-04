@@ -41,6 +41,13 @@ aws eks update-kubeconfig --region eu-central-1 \
   --name "$(terragrunt --working-dir ../terragrunt output -raw cluster_name)"
 ```
 
+After confirming the AWS cost prompt, the complete apply, kubeconfig update and
+Ansible deployment can be run with:
+
+```bash
+./scripts/deploy.sh
+```
+
 The EKS API endpoint is public for this demo and access is authenticated by
 AWS IAM. Worker nodes run in private subnets and do not expose SSH. A bastion
 is therefore not needed for this educational setup. For production, use a
@@ -86,6 +93,12 @@ Delete application objects first so the Ingress LoadBalancer can be released:
 ```bash
 kubectl delete -f ../kubernetes/ --ignore-not-found
 terragrunt --working-dir ../terragrunt destroy --non-interactive
+```
+
+The same cleanup is available as one confirmed command:
+
+```bash
+./scripts/destroy.sh
 ```
 
 Terraform removes the EKS control plane, Fargate profiles, VPC, subnets, NAT
