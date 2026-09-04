@@ -1,10 +1,15 @@
 # ImageTestEnv: EKS + EC2 + S3
 
 This branch contains the manual EKS + EC2 + S3 scenario. Terraform and
-Terragrunt create an EKS cluster with exactly three on-demand EC2 worker nodes
+Terragrunt create an EKS cluster with exactly three Spot EC2 worker nodes
 in private subnets. The NGINX Ingress Controller provisions an AWS
 LoadBalancer, and Kubernetes runs three application replicas behind the
 ClusterIP service.
+
+The worker group uses Spot capacity with both `t3.small` and `t3a.small` as
+eligible instance types. This reduces cost but allows AWS to interrupt nodes;
+the three replicas and PodDisruptionBudget reduce the impact, but do not make
+Spot equivalent to guaranteed capacity.
 
 Terraform also creates a private, encrypted, versioned S3 bucket for the audio
 files required by the site and a CloudFront distribution with Origin Access
