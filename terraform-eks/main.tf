@@ -77,18 +77,25 @@ module "eks" {
 
   enable_cluster_creator_admin_permissions = true
 
-  eks_managed_node_group_defaults = {
-    ami_type = "AL2_x86_64"
-  }
+  fargate_profiles = {
+    weather_demo = {
+      name = "weather-demo"
 
-  eks_managed_node_groups = {
-    default = {
-      name           = "default"
-      instance_types = ["t3.small"]
-      desired_size   = 1
-      min_size       = 1
-      max_size       = 2
-      capacity_type  = "SPOT"
+      selectors = [{
+        namespace = "weather-demo"
+      }]
+
+      subnet_ids = module.vpc.private_subnets
+    }
+
+    ingress_nginx = {
+      name = "ingress-nginx"
+
+      selectors = [{
+        namespace = "ingress-nginx"
+      }]
+
+      subnet_ids = module.vpc.private_subnets
     }
   }
 

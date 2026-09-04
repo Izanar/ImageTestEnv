@@ -1,8 +1,13 @@
-# ImageTestEnv: EKS
+# ImageTestEnv: EKS with Fargate HA
 
-This branch contains only the manual AWS Kubernetes scenario. It creates an
-Amazon EKS cluster, one Spot worker node, and an NGINX Ingress Controller.
-There is no S3 storage in this branch.
+This branch is the manually operated AWS Kubernetes scenario. Terraform and
+Terragrunt create an Amazon EKS cluster with Fargate profiles in two private
+subnets. The application runs as two replicas with a PodDisruptionBudget and
+zone spreading; there are no EC2 worker nodes in this scenario.
+
+The NGINX Ingress Controller and the application are both scheduled on
+Fargate. Terraform installs the controller with Helm. Ansible applies the
+Kubernetes objects and waits for the application pods to become ready.
 
 ## Requirements
 
@@ -20,6 +25,9 @@ The Kubernetes image contains the complete `html/` directory from `AI_Nginx`,
 including audio. Build and publish it to the public GitHub Container Registry
 package by starting the `Validate and Build Kubernetes Image` workflow manually
 from the Actions tab. The workflow does not run on push.
+
+Docker Hub is not used by this repository. The GHCR image packages the files so
+recreated pods receive the same site content without an interactive copy step.
 
 ## Create the environment
 
@@ -42,8 +50,8 @@ private endpoint with a bastion host or AWS Systems Manager Session Manager.
 
 Ansible runs the deployment commands after Terraform and Terragrunt create the
 cluster. Kubernetes remains responsible for scheduling and supervising the
-nginx pod. The Deployment uses the published application image, so the files
-remain available when Kubernetes recreates the pod.
+nginx pods. The Deployment uses the published application image, so the files
+remain available when Kubernetes recreates either pod.
 
 ```bash
 ansible-playbook -i localhost, ../ansible/eks-deploy.yml
@@ -80,7 +88,7 @@ kubectl delete -f ../kubernetes/ --ignore-not-found
 terragrunt --working-dir ../terragrunt destroy --non-interactive
 ```
 
-Terraform removes the EKS control plane, Spot node group, VPC, subnets, NAT
+Terraform removes the EKS control plane, Fargate profiles, VPC, subnets, NAT
 Gateway, route tables, Internet Gateway, security groups, and the Helm-installed
 Ingress Controller.
 
@@ -105,4 +113,5 @@ LoadBalancer remains briefly, wait for AWS cleanup and check again.
 ```
 
 This branch is intentionally separate from the automatic EC2 workflow in
-`main` and from the S3 audio variant in `feature/eks-s3-audio`.
+`main`, the three-node S3 scenario in `feature/eks-ec2-s3`, and the local WSL
+scenario in `feature/local-kubernetes-wsl`.
