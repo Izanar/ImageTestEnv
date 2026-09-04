@@ -35,7 +35,8 @@ A push to `main` starts the workflow
 these steps:
 
 1. Validates Terraform.
-2. Terragrunt requests one `t3.micro` Spot Ubuntu EC2 instance in the default VPC.
+2. Terragrunt requests one `t3.micro` Spot Ubuntu EC2 instance in the default VPC;
+    AWS assigns its public IP automatically.
 3. Opens SSH only to the GitHub runner IP and optional `USER_PUBLIC_IP`.
 4. Waits for SSH readiness.
 5. Ansible installs nginx, clones `AI_Nginx`, and publishes its `html/` folder.

@@ -9,13 +9,14 @@ read -r -p "AWS region [eu-central-1]: " aws_region
 aws_region="${aws_region:-eu-central-1}"
 read -r -p "SSH public key path [$HOME/.ssh/id_rsa.pub]: " public_key_path
 public_key_path="${public_key_path:-$HOME/.ssh/id_rsa.pub}"
-read -r -p "Your public IP/CIDR for SSH (optional): " user_public_ip
+read -r -p "Your public IPv4/CIDR for SSH (optional; not the instance IP): " user_public_ip
 read -r -p "This creates a billable AWS Spot EC2 instance. Continue? [yes/no]: " confirmation
 [[ "$confirmation" == "yes" ]] || { echo "Cancelled."; exit 0; }
 
 runner_ip="$(curl -fsSL https://api.ipify.org)"
 ssh_cidrs="[\"${runner_ip}/32\""
 if [[ -n "$user_public_ip" ]]; then
+  [[ "$user_public_ip" == */* ]] || user_public_ip+="/32"
   ssh_cidrs+=" ,\"${user_public_ip}\""
 fi
 ssh_cidrs+="]"
