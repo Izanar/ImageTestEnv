@@ -23,6 +23,10 @@ EC2 Spot alternative is implemented in `feature/eks-ec2-s3`.
 - Git
 - A public GitHub Container Registry package, built by the manual workflow
 
+Set `BUDGET_EMAIL` before running `./scripts/deploy.sh` to create an optional
+monthly AWS Budget alert with a default threshold of USD 5. Leave it blank to
+avoid creating the budget resource.
+
 ## Build the application image
 
 The Kubernetes image contains the complete `html/` directory from `AI_Nginx`,

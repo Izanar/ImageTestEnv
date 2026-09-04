@@ -49,4 +49,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/izanar/image-test-env-kubernetes:latest
+          tags: |
+            ghcr.io/izanar/image-test-env-kubernetes:latest
+            ghcr.io/izanar/image-test-env-kubernetes:${{ github.sha }}
