@@ -10,6 +10,15 @@ required `html/` files from `Izanar/AI_Nginx` into the pod.
 
 Run these commands inside WSL:
 
+For the complete setup, use the prompted one-command launcher:
+
+```bash
+./scripts/deploy.sh
+```
+
+It installs k3s through Terraform/Terragrunt and deploys the nginx pod with
+Ansible.
+
 ```bash
 terragrunt --working-dir terragrunt init
 terragrunt --working-dir terragrunt apply
@@ -35,6 +44,12 @@ whenever the pod is recreated.
 ```bash
 kubectl delete -f kubernetes/ --ignore-not-found
 terragrunt --working-dir terragrunt destroy --non-interactive
+```
+
+Or use the confirmed one-command cleanup:
+
+```bash
+./scripts/destroy.sh
 ```
 
 ## Validation
