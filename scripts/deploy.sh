@@ -18,6 +18,8 @@ if [[ -n "$expected_account_id" && "$expected_account_id" != "$actual_account_id
 fi
 read -r -p "Budget alert email (optional; leave blank to disable): " budget_email
 export BUDGET_EMAIL="$budget_email"
+read -r -p "Application image tag [latest]: " image_tag
+export APP_IMAGE_TAG="${image_tag:-latest}"
 read -r -p "This creates billable EKS, three EC2 Spot nodes, S3 and CloudFront. Continue? [yes/no]: " confirmation
 [[ "$confirmation" == "yes" ]] || { echo "Cancelled."; exit 0; }
 

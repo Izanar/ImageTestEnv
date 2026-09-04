@@ -8,6 +8,8 @@
     audio_sync_script: "{{ playbook_dir }}/../scripts/sync-audio-to-s3.sh"
     app_repo_url: "https://github.com/Izanar/AI_Nginx.git"
     audio_bucket_name: "{{ lookup('env', 'AUDIO_BUCKET_NAME') }}"
+    image_repository: "ghcr.io/izanar/image-test-env-s3"
+    image_tag: "{{ lookup('env', 'APP_IMAGE_TAG') | default('latest', true) }}"
 
   tasks:
     - name: Check required deployment tools
@@ -42,6 +44,10 @@
         - "{{ kubernetes_dir }}/service.yaml"
         - "{{ kubernetes_dir }}/ingress.yaml"
         - "{{ kubernetes_dir }}/pdb.yaml"
+      changed_when: true
+
+    - name: Pin the application image tag
+      ansible.builtin.command: kubectl -n weather-demo set image deployment/weather-app weather-app={{ image_repository }}:{{ image_tag }}
       changed_when: true
 
     - name: Wait for the application pod
