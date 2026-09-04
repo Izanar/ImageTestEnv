@@ -52,4 +52,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/izanar/image-test-env-s3:latest
+          tags: |
+            ghcr.io/izanar/image-test-env-s3:latest
+            ghcr.io/izanar/image-test-env-s3:${{ github.sha }}

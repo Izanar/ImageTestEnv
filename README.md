@@ -27,6 +27,10 @@ nginx proxies `/audio/` through CloudFront.
 - Git
 - A public GitHub Container Registry package, built by the manual workflow
 
+Set `BUDGET_EMAIL` before running `./scripts/deploy.sh` to create an optional
+monthly AWS Budget alert with a default threshold of USD 5. Leave it blank to
+avoid creating the budget resource.
+
 ## Build the application image
 
 The S3 image contains the non-audio site files, but no audio.

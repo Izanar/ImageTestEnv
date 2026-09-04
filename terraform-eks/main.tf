@@ -174,6 +174,24 @@ resource "kubernetes_namespace_v1" "weather_demo" {
   depends_on = [module.eks]
 }
 
+resource "aws_budgets_budget" "project" {
+  count = trimspace(var.budget_email) == "" ? 0 : 1
+
+  name         = "${var.project_name}-${var.environment}-monthly-s3"
+  budget_type  = "COST"
+  limit_amount = tostring(var.monthly_budget_usd)
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "FORECASTED"
+    subscriber_email_addresses = [var.budget_email]
+  }
+}
+
 resource "aws_cloudfront_origin_access_control" "audio" {
   name                              = "${var.project_name}-${var.environment}-audio"
   description                       = "Private access to the audio S3 bucket"
