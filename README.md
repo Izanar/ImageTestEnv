@@ -51,6 +51,16 @@ Kubernetes pods; they are not used by this branch.
 HTTP and HTTPS are public for this demo. SSH is limited to the runner and the
 optional user IP.
 
+## One-command local control
+
+The same workflow can be run from this checkout with prompts for the AWS
+region, SSH key and confirmation:
+
+```bash
+./scripts/deploy.sh
+./scripts/destroy.sh
+```
+
 ## Run manually
 
 The normal trigger is a push to `main`. To apply or destroy from GitHub Actions:
