@@ -9,8 +9,9 @@ Terragrunt is the workflow entry point for the EC2 Terraform module. Terraform
 defines resources, Terragrunt supplies environment defaults, and Ansible
 configures the created instance.
 
-The EKS/Kubernetes scenario is maintained separately in the
-`feature/kubernetes-eks` branch.
+The Kubernetes scenarios are maintained separately in
+`feature/eks-fargate-ha`, `feature/eks-ec2-s3`, and
+`feature/local-kubernetes-wsl`.
 
 ## Requirements
 
@@ -40,6 +41,12 @@ these steps:
 5. Ansible installs nginx, clones `AI_Nginx`, and publishes its `html/` folder.
 6. An HTTP smoke test checks the page.
 7. Terragrunt destroys the instance and related resources after 10 minutes.
+
+This branch deliberately does not build or run a Docker container. The EC2
+instance is a normal Ubuntu server, and Ansible installs nginx directly and
+copies the required files from the `Izanar/AI_Nginx` repository. The image
+workflows in the Kubernetes branches exist to package the same application for
+Kubernetes pods; they are not used by this branch.
 
 HTTP and HTTPS are public for this demo. SSH is limited to the runner and the
 optional user IP.
@@ -82,4 +89,7 @@ ansible-playbook --syntax-check -i ansible/inventory.ini ansible/playbook.yml
 ```
 
 This branch is intentionally focused on a cheap CI/CD infrastructure demo.
-It is not a production deployment template.
+Every push creates a fresh environment and the workflow attempts to delete it
+after 600 seconds. A cancelled workflow or runner failure can interrupt that
+cleanup, so the manual `destroy` action remains available. This is not a
+production deployment template.
