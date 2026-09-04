@@ -34,6 +34,9 @@ including audio. Build and publish it to the public GitHub Container Registry
 package by starting the `Validate and Build Kubernetes Image` workflow manually
 from the Actions tab. The workflow does not run on push.
 
+`./scripts/deploy.sh` asks for an image tag. Use the workflow's commit SHA tag
+for a reproducible deployment, or leave it as `latest` during development.
+
 Docker Hub is not used by this repository. The GHCR image packages the files so
 recreated pods receive the same site content without an interactive copy step.
 
