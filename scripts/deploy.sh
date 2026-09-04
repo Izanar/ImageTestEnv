@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+command -v terragrunt >/dev/null || { echo "terragrunt is required" >&2; exit 1; }
+command -v aws >/dev/null || { echo "aws CLI is required" >&2; exit 1; }
+command -v ansible-playbook >/dev/null || { echo "ansible-playbook is required" >&2; exit 1; }
+
+read -r -p "AWS region [eu-central-1]: " aws_region
+aws_region="${aws_region:-eu-central-1}"
+read -r -p "This creates billable EKS, three EC2 Spot nodes, S3 and CloudFront. Continue? [yes/no]: " confirmation
+[[ "$confirmation" == "yes" ]] || { echo "Cancelled."; exit 0; }
+
+export AWS_DEFAULT_REGION="$aws_region"
+terragrunt --working-dir terragrunt init
+terragrunt --working-dir terragrunt apply --auto-approve -var="aws_region=${aws_region}"
+cluster_name="$(terragrunt --working-dir terragrunt output -raw cluster_name)"
+export AUDIO_BUCKET_NAME="$(terragrunt --working-dir terragrunt output -raw audio_bucket_name)"
+aws eks update-kubeconfig --region "$aws_region" --name "$cluster_name"
+ansible-playbook -i localhost, ansible/eks-deploy.yml
+kubectl get pods -n weather-demo -o wide
+printf 'Audio bucket: %s\n' "$AUDIO_BUCKET_NAME"

@@ -46,6 +46,14 @@ aws eks update-kubeconfig --region eu-central-1 \
   --name "$(terragrunt --working-dir ../terragrunt output -raw cluster_name)"
 ```
 
+The complete Terraform, kubeconfig, audio sync and Ansible deployment is also
+available as one command. It asks for confirmation because AWS resources are
+billable:
+
+```bash
+./scripts/deploy.sh
+```
+
 The EKS API endpoint is public for this demo and access is authenticated by
 AWS IAM. Worker nodes run in private subnets and do not expose SSH. A bastion
 is therefore not needed for this educational setup. For production, use a
@@ -95,6 +103,13 @@ Delete application objects first so the Ingress LoadBalancer can be released:
 ```bash
 kubectl delete -f ../kubernetes/ --ignore-not-found
 terragrunt --working-dir ../terragrunt destroy --non-interactive
+```
+
+Use the confirmed cleanup command to remove Kubernetes, EKS, Spot nodes, S3
+and CloudFront:
+
+```bash
+./scripts/destroy.sh
 ```
 
 Terraform then removes the EKS control plane, three-node EC2 group, private S3
