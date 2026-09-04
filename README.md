@@ -9,6 +9,10 @@ The NGINX Ingress Controller and the application are both scheduled on
 Fargate. Terraform installs the controller with Helm. Ansible applies the
 Kubernetes objects and waits for the application pods to become ready.
 
+ECS has a separate Fargate Spot capacity option, but EKS Fargate pods cannot be
+marked as Spot. This branch therefore uses standard EKS Fargate; the discounted
+EC2 Spot alternative is implemented in `feature/eks-ec2-s3`.
+
 ## Requirements
 
 - AWS CLI configured with permissions for EKS, EC2, IAM, and ELB
