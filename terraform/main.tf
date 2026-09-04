@@ -96,6 +96,14 @@ resource "aws_instance" "web" {
   vpc_security_group_ids = [aws_security_group.web.id]
   key_name               = aws_key_pair.deployer.key_name
 
+  instance_market_options {
+    market_type = "spot"
+
+    spot_options {
+      instance_interruption_behavior = "terminate"
+    }
+  }
+
   tags = {
     Name        = "${var.project_name}-${var.environment}-web"
     Environment = var.environment

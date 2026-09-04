@@ -35,7 +35,7 @@ A push to `main` starts the workflow
 these steps:
 
 1. Validates Terraform.
-2. Terragrunt creates one `t3.micro` Ubuntu EC2 instance in the default VPC.
+2. Terragrunt requests one `t3.micro` Spot Ubuntu EC2 instance in the default VPC.
 3. Opens SSH only to the GitHub runner IP and optional `USER_PUBLIC_IP`.
 4. Waits for SSH readiness.
 5. Ansible installs nginx, clones `AI_Nginx`, and publishes its `html/` folder.
@@ -92,4 +92,5 @@ This branch is intentionally focused on a cheap CI/CD infrastructure demo.
 Every push creates a fresh environment and the workflow attempts to delete it
 after 600 seconds. A cancelled workflow or runner failure can interrupt that
 cleanup, so the manual `destroy` action remains available. This is not a
-production deployment template.
+production deployment template. Spot capacity can be interrupted by AWS before
+the ten-minute cleanup, so the workflow may fail before the smoke test.
