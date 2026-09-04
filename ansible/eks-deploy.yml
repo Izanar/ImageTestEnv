@@ -41,6 +41,7 @@
         - "{{ kubernetes_dir }}/deployment.yaml"
         - "{{ kubernetes_dir }}/service.yaml"
         - "{{ kubernetes_dir }}/ingress.yaml"
+        - "{{ kubernetes_dir }}/pdb.yaml"
       changed_when: true
 
     - name: Wait for the application pod
@@ -48,3 +49,34 @@
         kubectl wait --namespace weather-demo --for=condition=ready pod
         -l app=weather-app --timeout=180s
       changed_when: false
+
+    - name: Clone application source for non-audio pod content
+      ansible.builtin.git:
+        repo: "{{ app_repo_url }}"
+        dest: "/tmp/ai-nginx"
+        version: HEAD
+        depth: 1
+
+    - name: Find application pods
+      ansible.builtin.command: kubectl get pods -n weather-demo -l app=weather-app -o jsonpath={range .items[*]}{.metadata.name}{"\\n"}{end}
+      register: application_pods
+      changed_when: false
+
+    - name: Copy AI_Nginx non-audio files into every application pod
+      ansible.builtin.shell: |
+        while IFS= read -r pod; do
+          while IFS= read -r -d '' file; do
+            relative="${file#/tmp/ai-nginx/html/}"
+            target_dir="/usr/share/nginx/html/$(dirname "$relative")"
+            kubectl exec -n weather-demo "$pod" -- mkdir -p "$target_dir"
+            kubectl cp "$file" "weather-demo/${pod}:$target_dir/$(basename "$relative")"
+          done < <(find /tmp/ai-nginx/html -type f ! -path '/tmp/ai-nginx/html/audio/*' -print0)
+        done <<< "{{ application_pods.stdout }}"
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Remove local application checkout
+      ansible.builtin.file:
+        path: "/tmp/ai-nginx"
+        state: absent

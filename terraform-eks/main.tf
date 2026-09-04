@@ -89,10 +89,10 @@ module "eks" {
     default = {
       name           = "default"
       instance_types = ["t3.small"]
-      desired_size   = 1
-      min_size       = 1
-      max_size       = 2
-      capacity_type  = "SPOT"
+      desired_size   = 3
+      min_size       = 3
+      max_size       = 3
+      capacity_type  = "ON_DEMAND"
     }
   }
 

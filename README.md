@@ -1,8 +1,16 @@
-# ImageTestEnv: EKS
+# ImageTestEnv: EKS + EC2 + S3
 
-This branch contains only the manual AWS Kubernetes scenario. It creates an
-Amazon EKS cluster, one Spot worker node, an NGINX Ingress Controller, and a
-private S3 bucket for audio files from `AI_Nginx`.
+This branch contains the manual EKS + EC2 + S3 scenario. Terraform and
+Terragrunt create an EKS cluster with exactly three on-demand EC2 worker nodes
+in private subnets. The NGINX Ingress Controller provisions an AWS
+LoadBalancer, and Kubernetes runs three application replicas behind the
+ClusterIP service.
+
+Terraform also creates a private, encrypted, versioned S3 bucket for the audio
+files required by the site and a CloudFront distribution with Origin Access
+Control. Ansible syncs audio from `Izanar/AI_Nginx` to S3 and applies the nginx
+Kubernetes manifests. The application image contains the rest of the site;
+nginx proxies `/audio/` through CloudFront.
 
 ## Requirements
 
@@ -16,7 +24,7 @@ private S3 bucket for audio files from `AI_Nginx`.
 
 ## Build the application image
 
-The S3 image contains `index.html`, `script.js`, and `style.css`, but no audio.
+The S3 image contains the non-audio site files, but no audio.
 Build and publish it to the public GitHub Container Registry package by
 starting the `Validate and Build S3 Image` workflow manually from the Actions
 tab. The workflow does not run on push.
@@ -84,7 +92,7 @@ kubectl delete -f ../kubernetes/ --ignore-not-found
 terragrunt --working-dir ../terragrunt destroy --non-interactive
 ```
 
-Terraform then removes the EKS control plane, Spot node group, private S3
+Terraform then removes the EKS control plane, three-node EC2 group, private S3
 bucket, CloudFront distribution, VPC, subnets, NAT Gateway, route tables,
 Internet Gateway, security groups, and Helm-installed Ingress Controller.
 
