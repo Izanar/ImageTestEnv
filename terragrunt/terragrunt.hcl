@@ -1,9 +1,8 @@
 terraform {
-  source = "../terraform-eks"
+  source = "../terraform-local"
 }
 
 inputs = {
-  project_name = "image-test-env-eks"
-  environment  = "dev"
-  aws_region   = "eu-central-1"
+  kubernetes_version = "v1.30.6+k3s1"
+  node_port           = 30080
 }

@@ -3,8 +3,6 @@ kind: Service
 metadata:
   name: weather-app
   namespace: weather-demo
-  labels:
-    app: weather-app
 spec:
   selector:
     app: weather-app
@@ -12,4 +10,5 @@ spec:
     - name: http
       port: 80
       targetPort: http
-  type: ClusterIP
+      nodePort: 30080
+  type: NodePort

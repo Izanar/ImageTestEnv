@@ -1,0 +1,30 @@
+name: Validate Local WSL Kubernetes
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5
+
+      - name: Validate Terraform
+        run: |
+          terraform -chdir=terraform-local fmt -check -recursive
+          terraform -chdir=terraform-local init -backend=false -input=false
+          terraform -chdir=terraform-local validate
+
+      - name: Validate Ansible
+        run: ansible-playbook --syntax-check -i localhost, ansible/local-deploy.yml

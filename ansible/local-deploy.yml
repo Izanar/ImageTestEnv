@@ -1,0 +1,47 @@
+---
+- name: Install nginx and copy AI_Nginx into the local pod
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    kubernetes_dir: "{{ playbook_dir }}/../kubernetes"
+    app_repo_url: "https://github.com/Izanar/AI_Nginx.git"
+    app_cache_dir: "/tmp/ai-nginx"
+
+  tasks:
+    - name: Check local Kubernetes client
+      ansible.builtin.command: kubectl version --client
+      changed_when: false
+
+    - name: Clone application source
+      ansible.builtin.git:
+        repo: "{{ app_repo_url }}"
+        dest: "{{ app_cache_dir }}"
+        version: HEAD
+        depth: 1
+
+    - name: Apply namespace, nginx deployment and service
+      ansible.builtin.command: kubectl apply -f {{ item }}
+      loop:
+        - "{{ kubernetes_dir }}/namespace.yaml"
+        - "{{ kubernetes_dir }}/deployment.yaml"
+        - "{{ kubernetes_dir }}/service.yaml"
+      changed_when: true
+
+    - name: Wait for nginx pod
+      ansible.builtin.command: kubectl wait --namespace weather-demo --for=condition=ready pod -l app=weather-app --timeout=180s
+      changed_when: false
+
+    - name: Find nginx pod
+      ansible.builtin.command: kubectl get pod -n weather-demo -l app=weather-app -o jsonpath={.items[0].metadata.name}
+      register: nginx_pod
+      changed_when: false
+
+    - name: Copy AI_Nginx files into nginx pod
+      ansible.builtin.command: kubectl cp {{ app_cache_dir }}/html/. weather-demo/{{ nginx_pod.stdout }}:/usr/share/nginx/html/
+      changed_when: true
+
+    - name: Remove local source checkout
+      ansible.builtin.file:
+        path: "{{ app_cache_dir }}"
+        state: absent
