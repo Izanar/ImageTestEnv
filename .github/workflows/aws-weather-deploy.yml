@@ -24,14 +24,24 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
     env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
       AWS_DEFAULT_REGION: ${{ github.event.inputs.region || 'eu-central-1' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_DEFAULT_REGION }}
+
+      - name: Verify AWS account
+        run: aws sts get-caller-identity
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -186,7 +196,7 @@ jobs:
           curl -I --max-time 120 "http://${PUBLIC_IP}"
 
       - name: Auto destroy after 10 minutes
-        if: github.event_name == 'push'
+        if: ${{ always() && github.event_name == 'push' }}
         run: |
           echo "This push-triggered deployment will self-destruct in 600 seconds."
           sleep 600

@@ -17,16 +17,17 @@ The Kubernetes scenarios are maintained separately in
 
 Configure these GitHub repository secrets:
 
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- optional `AWS_SESSION_TOKEN`
+- `AWS_ROLE_ARN` for GitHub Actions OIDC
 - `AWS_SSH_PRIVATE_KEY`
 - `AWS_SSH_PUBLIC_KEY`
 - optional `USER_PUBLIC_IP`
 
-The AWS identity must be allowed to manage the EC2 resources used by this
-workflow. Terraform 1.8.5+, Terragrunt 0.67.16+, and Ansible are installed by
-the workflow runner.
+The AWS role must trust GitHub's OIDC provider for this repository and be
+allowed to manage the EC2 resources used by this workflow. Terraform 1.8.5+,
+Terragrunt 0.67.16+, and Ansible are installed by the workflow runner.
+
+Set `BUDGET_EMAIL` locally to enable the optional AWS Budget alert. A budget
+does not create compute resources, but AWS Billing permissions are required.
 
 ## Automatic deployment
 

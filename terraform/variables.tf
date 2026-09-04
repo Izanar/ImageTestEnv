@@ -45,3 +45,15 @@ variable "https_cidr_blocks" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
+
+variable "budget_email" {
+  description = "Optional email address for the monthly AWS Budget alert"
+  type        = string
+  default     = ""
+}
+
+variable "monthly_budget_usd" {
+  description = "Optional AWS Budget threshold in USD"
+  type        = number
+  default     = 5
+}

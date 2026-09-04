@@ -7,4 +7,5 @@ inputs = {
   environment   = "dev"
   aws_region    = get_env("AWS_DEFAULT_REGION", "eu-central-1")
   instance_type = "t3.micro"
+  budget_email  = get_env("BUDGET_EMAIL", "")
 }

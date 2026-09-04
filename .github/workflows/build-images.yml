@@ -8,8 +8,8 @@ on:
         required: true
         type: choice
         options:
-          - feature/kubernetes-eks
-          - feature/eks-s3-audio
+          - feature/eks-fargate-ha
+          - feature/eks-ec2-s3
 
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
       - name: Select image name
         id: image
         run: |
-          if [[ "${{ inputs.branch }}" == "feature/kubernetes-eks" ]]; then
+          if [[ "${{ inputs.branch }}" == "feature/eks-fargate-ha" ]]; then
             echo "name=ghcr.io/izanar/image-test-env-kubernetes:latest" >> "$GITHUB_OUTPUT"
           else
             echo "name=ghcr.io/izanar/image-test-env-s3:latest" >> "$GITHUB_OUTPUT"
@@ -45,4 +45,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.image.outputs.name }}
+          tags: |
+            ${{ steps.image.outputs.name }}
+            ${{ steps.image.outputs.name }}-${{ github.sha }}
